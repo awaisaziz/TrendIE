@@ -101,12 +101,12 @@ The remaining acceptance blockers are:
 **Accountable owner:** Person 4 / Om & Tirth (agent and attack testing)  
 **Supporting owners:** Person 1 / Awais (gateway decision), Person 5 / Nasar (playground integration)
 
-- `scripts/demo-attack.mjs` submits the protected malicious proposal to the live gateway and verifies its rejection. The console now has a paired comparison display.
-- The vulnerable path currently prints a hard-coded rogue `wallet.sendTransaction` and an asserted stolen-payment outcome; it does not run an unprotected agent or execute a transfer. The clean path consumes a gateway approval, but does not dispatch a provider payment. The script header and final summary still describe these as executed/settled, which overstates the evidence.
-- The Web Console comparison card also says “Funds Stolen!” for the hypothetical vulnerable path, although it performs no wallet action; label this outcome as simulated/hypothetical.
-- This provides paired gateway-policy evidence, but does not yet demonstrate a successful attack against a controlled unprotected agent or a legitimate provider payment. No funds should be described as stolen or settled by this fixture.
+- `scripts/demo-attack.mjs` submits the protected malicious proposal to the live gateway and verifies its rejection. Separately, the Person 5 branch now calls PR #11's controlled runner with fixed fixture ports and a local policy; that UI flow does not call the actual Gateway.
+- The controlled runner uses a fixture model to produce the vulnerable proposal/action; its protected decision comes from a local fixture policy. It does not call the real gateway or execute a transfer. The clean path in `scripts/demo-attack.mjs` consumes a gateway approval, but does not dispatch a provider payment. The script header and final summary still overstate execution/settlement.
+- The Person 5 branch removed the Web Console's former “Funds Stolen!”/“Blocked 0 satoshis” assertions. The comparison now reports a simulated action and `NOT_SETTLED`.
+- The separate protected leg in `scripts/demo-attack.mjs` provides gateway-policy evidence; the new UI flow proves no gateway behavior. Neither provides a successful controlled unprotected-agent attack or a legitimate provider payment. No funds should be described as stolen or settled by these fixtures.
 
-**Needed to close:** run the same malicious content through a controlled vulnerable agent and capture its changed proposal/action in a safe test harness; run the protected proposal through the live gateway and retain decision/audit evidence; label simulated actions accurately. A separate provider-backed legitimate payment is required for F-005/F-013 acceptance.
+**Needed to close:** obtain final adversarial review of the integrated controlled harness; run the protected proposal through the live gateway and retain decision/audit evidence. A separate provider-backed legitimate payment is required for F-005/F-013 acceptance.
 
 ### G-07 — PDF extraction and verification evidence
 

@@ -1,4 +1,4 @@
-# Guard Console (local frontend)
+# Sentinel (local frontend)
 
 The Person 5 local frontend slice is implemented here as a Next.js App Router workspace with
 Tailwind. It is a single-user local demo, bound to `127.0.0.1:3001`; the Fastify gateway remains

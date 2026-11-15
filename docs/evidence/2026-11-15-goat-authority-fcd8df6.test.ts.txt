@@ -1,0 +1,92 @@
+import Fastify from 'fastify';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { query, state } = vi.hoisted(() => {
+  const state = { approval: {} as Record<string, unknown>, intent: {} as Record<string, unknown>, execution: null as Record<string, unknown> | null, proposal: {} as Record<string, unknown>, decision: {} as Record<string, unknown>, calls: [] as Array<{ sql: string; values?: unknown[] }> };
+  const query = vi.fn(async (sql: string, values?: unknown[]) => {
+    state.calls.push({ sql, values });
+    if (sql.includes('FROM approvals WHERE id =')) return { rows: [state.approval] };
+    if (sql.includes('FROM intents WHERE id =')) return { rows: [state.intent] };
+    if (sql.includes('FROM executions WHERE execution_id =')) return { rows: state.execution ? [state.execution] : [] };
+    if (sql.includes('FROM approvals WHERE execution_id =')) return { rows: state.approval ? [state.approval] : [] };
+    if (sql.includes('FROM proposals WHERE id =')) return { rows: [state.proposal] };
+    if (sql.includes('UPDATE executions')) {
+      if (sql.includes('checkpoint_phase')) Object.assign(state.execution ??= {}, { checkpoint_phase: values?.[1], checkpoint_tx_hash: values?.[2], tx_hash_or_checkout_ref: state.execution?.tx_hash_or_checkout_ref ?? values?.[2] });
+      else Object.assign(state.execution ??= {}, { status: values?.[1], tx_hash_or_checkout_ref: values?.[2] ?? state.execution?.tx_hash_or_checkout_ref });
+      return { rows: [] };
+    }
+    if (sql.includes('INSERT INTO executions')) { state.execution = { status: values?.[2], tx_hash_or_checkout_ref: values?.[3] }; return { rows: [] }; }
+    return { rows: [] };
+  });
+  return { query, state };
+});
+
+vi.mock('../src/db/client.js', () => ({ pool: { query }, withTransaction: (fn: (client: { query: typeof query }) => unknown) => fn({ query }) }));
+vi.mock('../src/audit/hashChain.js', () => ({ appendAuditLog: vi.fn(async () => undefined) }));
+vi.mock('../src/auth/plugin.js', async () => {
+  return { requireRole: () => ((req: { callerRole?: string }, _reply: unknown, done: () => void) => { req.callerRole = 'adapter-goat'; done(); }) };
+});
+
+import { goatAuthorityRoutes } from '../src/routes/goatAuthority.js';
+
+const proposal = { version: 1, ownerId: 'Alice', intentId: 'intent-1', intentVersion: 1, platform: 'goat', itemId: 'item', sellerId: 'seller', money: { amount: '1', scale: 18 }, asset: 'BTC', chain: 'goat-testnet', providerArgs: { recipient: '0x2222222222222222222222222222222222222222' } };
+
+async function appForTest() {
+  const app = Fastify();
+  await app.register(goatAuthorityRoutes);
+  return app;
+}
+
+beforeEach(() => {
+  state.calls = [];
+  state.approval = { id: 'approval-1', execution_id: 'exec-1', intent_id: 'intent-1', decision_id: 'decision-1', owner_id: 'Alice', proposal_hash: 'H', expires_at: new Date(Date.now() + 60000).toISOString(), consumed_at: null, bound_destination: '0x1111111111111111111111111111111111111111' };
+  state.intent = { id: 'intent-1', owner: 'Alice', remaining_uses: 2, expiry: new Date(Date.now() + 60000).toISOString(), intent_version: 1 };
+  state.execution = null;
+  state.proposal = { raw_payload: { ...proposal, money: { amount: '100', scale: 18 }, providerArgs: { recipient: '0x1111111111111111111111111111111111111111' } } };
+});
+
+describe('goatAuthority actual V1 routes', () => {
+  it('claim binds the request fingerprint and altered recipient/amount without checking stored approval hash', async () => {
+    const app = await appForTest();
+    const response = await app.inject({ method: 'POST', url: '/v1/goat/approvals/approval-1/claim', payload: { version: 1, kind: 'claim', callerOwnerId: 'Alice', proposal: { ...proposal, money: { amount: '1', scale: 18 }, providerArgs: { recipient: '0x3333333333333333333333333333333333333333' } }, fingerprint: 'F', spendAuthorization: { ownerId: 'Alice', authorizationId: 'auth-1', maxAmountWei: '1' } } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().binding).toMatchObject({ fingerprint: 'F', ownerId: 'Alice', destination: '0x3333333333333333333333333333333333333333', amount: '1' });
+    expect(state.calls.some((c) => c.sql.includes('UPDATE approvals'))).toBe(true);
+    await app.close();
+  });
+
+  it('checkpoint acknowledges replacement broadcast hash while COALESCE preserves prior reference', async () => {
+    state.execution = { status: 'pending', tx_hash_or_checkout_ref: `0x${'a'.repeat(64)}`, checkpoint_tx_hash: `0x${'a'.repeat(64)}` };
+    const app = await appForTest();
+    const hashB = `0x${'b'.repeat(64)}`;
+    const response = await app.inject({ method: 'PUT', url: '/v1/goat/executions/exec-1/checkpoint', payload: { version: 1, kind: 'checkpoint', executionId: 'exec-1', phase: 'broadcast', txHash: hashB } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ status: 'persisted', txHash: hashB });
+    expect(state.calls.find((c) => c.sql.includes('UPDATE executions'))?.values).toEqual(['exec-1', 'broadcast', hashB]);
+    expect(state.execution?.tx_hash_or_checkout_ref).toBe(`0x${'a'.repeat(64)}`);
+    await app.close();
+  });
+
+  it('outcome overwrites succeeded with failed and accepts provider reference B', async () => {
+    state.execution = { status: 'succeeded', tx_hash_or_checkout_ref: `0x${'a'.repeat(64)}` };
+    const app = await appForTest();
+    const refB = `0x${'b'.repeat(64)}`;
+    const response = await app.inject({ method: 'PUT', url: '/v1/goat/executions/exec-1/outcome', payload: { version: 1, kind: 'outcome', executionId: 'exec-1', status: 'failed', providerReference: refB } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ resultStatus: 'failed', providerReference: refB });
+    expect(state.calls.find((c) => c.sql.includes('UPDATE executions'))?.values).toEqual(['exec-1', 'failed', refB, null, '{}']);
+    expect(state.execution).toMatchObject({ status: 'failed', tx_hash_or_checkout_ref: refB });
+    await app.close();
+  });
+
+  it('outcome inserts an execution from an unconsumed approval', async () => {
+    state.execution = null;
+    const app = await appForTest();
+    const response = await app.inject({ method: 'PUT', url: '/v1/goat/executions/exec-1/outcome', payload: { version: 1, kind: 'outcome', executionId: 'exec-1', status: 'succeeded', providerReference: `0x${'c'.repeat(64)}` } });
+    expect(response.statusCode).toBe(200);
+    expect(response.json().status).toBe('persisted');
+    expect(state.calls.some((c) => c.sql.includes('INSERT INTO executions'))).toBe(true);
+    expect(state.approval.consumed_at).toBeNull();
+    await app.close();
+  });
+});

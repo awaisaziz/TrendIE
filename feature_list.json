@@ -7,7 +7,7 @@
     "blocked": "Progress depends on an unresolved owner, API, provider, or authorization gate.",
     "not_started": "No implementation work is recorded."
   },
-  "status_basis": "Statuses reconciled against PRD, Division, source and recorded evidence at origin/develop 9133094 (merged to main at 0c08845). The repository documents live Gateway/PostgreSQL runs for the PDF and replay demos, but those demos were not rerun during this reconciliation and no real provider checkout or payment is evidenced. F-005 remains partial because the vulnerable-agent path is narrated and the clean path consumes approval without dispatching a provider payment. F-006/F-007 remain blocked; F-009/F-010/F-013 retain their API, provider and integration gates.",
+  "status_basis": "Statuses reconciled against PRD, Division, origin/develop dbfac42, the current nasar-frontend work including AAT runner 165038c, and PRs #10-#12 as observed on 2026-11-15. The frontend route calls PR #11's shared comparison runner and evidence validator with fixed fixture ports and a local policy. It does not call the real gateway, provider, or payment system. No real provider checkout or payment is evidenced. F-004 and F-005 remain partial; F-006/F-007 remain blocked; F-009/F-010 remain gated on owner APIs and provider evidence; F-013 remains blocked on integration and acceptance evidence.",
   "source_documents": [
     "PRD.md",
     "Division.md"

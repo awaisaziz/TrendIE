@@ -25,6 +25,8 @@ npm run test:pdf
 
 ## Integration handoff
 
+For a UI consuming the current server-side fixture runner interface, see [AAT UI fixture integration](aat-ui-integration.md). This documents the public API and unit semantics without implying gateway or live-provider agreement.
+
 **Awais (gateway):** consume validated proposal output as untrusted input; bind authenticated owner and original intent from server state; revalidate all exact fields and policy; inspection must only add advisory evidence. Do not accept agent identity fields or any approval assertion. No authorization signature is defined by this package.
 
 **Nassar (evidence/status UI):** show listing provenance, proposal fields, inspection flags/offsets, source spans, and source (`scripted` vs `model`) separately. Mark findings advisory. Never imply a proposal is approved, purchased, settled, or fulfilled.
@@ -32,3 +34,18 @@ npm run test:pdf
 ## Evidence and remaining gates
 
 Local typecheck, lint, build, Vitest, and Python checks cover synthetic fixtures and mocked child processes only. They do not prove real LLM resistance, authenticated provider discovery, gateway enforcement, PDF sandbox isolation beyond the implemented process limits, numeric spend enforcement by a model provider, or payment behavior. Authentication (`401`), gateway availability, and a nonzero numeric budget remain open integration gates. No live model, provider, gateway, checkout, or payment stage is verified by this runbook. Stages remain pending until owner integration and fresh evidence are reviewed.
+
+
+## Controlled offline comparison
+
+Build the workspace and run the standalone policy comparison:
+
+```sh
+fnm exec --using 22.23.4 npm run build
+fnm exec --using 22.23.4 npm run demo:controlled
+fnm exec --using 22.23.4 npm run demo:controlled -- --clean
+```
+
+The CLI imports the built public `@trendie/agent` package from this checkout. The default fixture changes seller, amount, and recipient and must be rejected with policy reasons; `--clean` uses the trusted seller, listing amount, and authorized recipient and must be approved with `NOT_SETTLED`. Both runs use GOAT to avoid Qatom’s USD-TDN-specific contract requirement. It uses a fixed fixture candidate and an in-process policy that checks trusted seller, item, amount, scale, asset, and recipient. The vulnerable record is simulation-only; no provider dispatch or settlement occurs. Output fields and acceptance cases are documented in [attack evidence](attack-evidence.md).
+
+This does not establish live LLM resistance, gateway enforcement, or execution/settlement outcomes. Gateway/PostgreSQL integration, authenticated provider evidence, and any live-model or payment work remain separately gated and unverified.

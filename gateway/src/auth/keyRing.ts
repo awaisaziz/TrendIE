@@ -5,6 +5,8 @@ export type UserRole = (typeof SERVICE_KEY_SLOTS)[number]['role'];
 
 export interface ResolvedKey {
   role: UserRole;
+  /** Owner principal bound to this key by server configuration, if any. */
+  ownerId?: string;
   /** SHA-256 of the key. Safe to use as a rate-limit identity; never the key itself. */
   fingerprint: string;
 }
@@ -28,20 +30,21 @@ export function fingerprintKey(apiKey: string): string {
  */
 export function createKeyRing(cfg: Config): KeyRing {
   const revoked = new Set(splitList(cfg.API_KEYS_REVOKED_SHA256).map((entry) => entry.toLowerCase()));
-  const byFingerprint = new Map<string, UserRole>();
+  const byFingerprint = new Map<string, { role: UserRole; ownerId?: string }>();
   for (const slot of SERVICE_KEY_SLOTS) {
     const keys = [cfg[slot.current], ...splitList(cfg[slot.previous])].filter((value): value is string => Boolean(value));
+    const ownerId = cfg[slot.owner] || undefined;
     for (const key of keys) {
       const fingerprint = fingerprintKey(key);
-      if (!revoked.has(fingerprint)) byFingerprint.set(fingerprint, slot.role);
+      if (!revoked.has(fingerprint)) byFingerprint.set(fingerprint, ownerId ? { role: slot.role, ownerId } : { role: slot.role });
     }
   }
   return {
     resolve(apiKey) {
       if (typeof apiKey !== 'string' || apiKey.length === 0 || apiKey.length > MAX_KEY_LENGTH) return undefined;
       const fingerprint = fingerprintKey(apiKey);
-      const role = byFingerprint.get(fingerprint);
-      return role ? { role, fingerprint } : undefined;
+      const entry = byFingerprint.get(fingerprint);
+      return entry ? { ...entry, fingerprint } : undefined;
     },
     fingerprints: () => byFingerprint.keys(),
   };

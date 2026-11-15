@@ -37,7 +37,8 @@
     "demo:pdf": "node scripts/demo-pdf-attack.mjs",
     "demo:replay": "node scripts/demo-replay-attack.mjs",
     "demo:audit": "node scripts/demo-audit-integrity.mjs",
-    "qatom:probe": "node --env-file=.env packages/qatom/dist/cli.js"
+    "qatom:probe": "node packages/qatom/dist/cli.js",
+    "demo:controlled": "node scripts/demo-controlled-comparison.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.19.0",

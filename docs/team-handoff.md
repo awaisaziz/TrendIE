@@ -135,3 +135,27 @@ recovery, and finish the disposable PostgreSQL test harness. Nasar's frontend wo
 bridges stay disabled until the trusted interface is ready. Live payments and production are not
 cleared; Stages 1–3 remain open. No paid provider/model execution tests, wallet transactions or
 migrations have been run.
+
+## Person 5 controlled comparison update — 2026-11-15
+
+The current `nasar-frontend` work adds a same-origin comparison endpoint and console panel for
+attack and compliant-proposal cases over the same malicious listing. The server calls PR #11's
+`runControlledComparison` and `validateEvidence` with fixed task, discovery, fixture-model, and local
+policy inputs. The response includes proposal-linked listing hash, fingerprint, and source spans,
+while omitting owner and model input/output data. It preserves `simulation: true`, `executed: false`,
+`providerDispatch: false`, and `NOT_SETTLED`. It does not call the real Gateway or any provider,
+wallet, or payment system. The old hard-coded “Funds Stolen!” and “Blocked 0 satoshis” UI panel was
+removed. PR #11 remains unmerged; Om approved this interface use for fixture integration, which is
+not final adversarial clearance.
+
+This adds Person 5 UI/demo integration but closes no MVP feature gate: F-004/F-005 remain partial,
+and F-009/F-010/F-013 remain blocked or API/integration-gated. Actual gateway-backed protected
+evidence, adversarial clearance, provider outcome/receipt, Qatom capability gates, owner-scoped
+history, and review APIs remain outstanding. See [mvp gaps](../mvp-gaps.md).
+
+**Checks on Node 22.20.0:** root `npm test` passed 121 tests across 24 files; root lint, web
+typecheck, web production build, and `git diff --check` passed. A local HTTP smoke check returned
+attack `reject` and clean `approve`; both remained `NOT_SETTLED` and neither dispatched a provider.
+These checks use fixed fixtures and do not establish PostgreSQL integration, gateway-backed attack
+protection, provider settlement, or visual browser acceptance. No database, paid model/provider,
+wallet, chain, or production action was used.

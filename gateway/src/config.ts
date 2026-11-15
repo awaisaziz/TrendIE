@@ -32,6 +32,20 @@ const envSchema = z.object({
   API_KEY_APPROVER_PREVIOUS: optionalSecret,
   // Comma-separated SHA-256 hex fingerprints of keys that must be refused even if still configured.
   API_KEYS_REVOKED_SHA256: optionalSecret,
+  // Owner principal bound to each service key (current and previous keys share it). A key with
+  // no bound owner cannot use owner-scoped GOAT authority routes. Never read owner from a request.
+  API_KEY_AGENT_OWNER_ID: optionalSecret,
+  API_KEY_ADAPTER_GOAT_OWNER_ID: optionalSecret,
+  API_KEY_ADAPTER_QATOM_OWNER_ID: optionalSecret,
+  API_KEY_DASHBOARD_OWNER_ID: optionalSecret,
+  API_KEY_ADMIN_OWNER_ID: optionalSecret,
+  API_KEY_APPROVER_OWNER_ID: optionalSecret,
+  // Server-recorded GOAT spend authorization. A ceiling of 0 (the default) blocks every GOAT claim.
+  GOAT_SPEND_AUTHORIZATION_ID: optionalSecret,
+  // Rolling 24-hour GOAT spend limit per owner, in wei. Empty means no daily limit beyond the ceiling.
+  // Pending and unknown executions count as spent until they resolve.
+  GOAT_DAILY_LIMIT_WEI: z.preprocess((value) => (value === '' ? undefined : value), z.string().regex(/^[1-9][0-9]{0,37}$/, 'GOAT_DAILY_LIMIT_WEI must be a positive integer').optional()),
+  GOAT_SPEND_CEILING_WEI: z.string().regex(/^(0|[1-9][0-9]{0,37})$/, 'GOAT_SPEND_CEILING_WEI must be a non-negative integer').default('0'),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
   RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().default(60),
   AUTH_FAILURE_MAX: z.coerce.number().int().positive().default(20),
@@ -40,12 +54,12 @@ const envSchema = z.object({
 export type Config = z.infer<typeof envSchema>;
 
 export const SERVICE_KEY_SLOTS = [
-  { role: 'agent', current: 'API_KEY_AGENT', previous: 'API_KEY_AGENT_PREVIOUS' },
-  { role: 'adapter-goat', current: 'API_KEY_ADAPTER_GOAT', previous: 'API_KEY_ADAPTER_GOAT_PREVIOUS' },
-  { role: 'adapter-qatom', current: 'API_KEY_ADAPTER_QATOM', previous: 'API_KEY_ADAPTER_QATOM_PREVIOUS' },
-  { role: 'dashboard', current: 'API_KEY_DASHBOARD', previous: 'API_KEY_DASHBOARD_PREVIOUS' },
-  { role: 'admin', current: 'API_KEY_ADMIN', previous: 'API_KEY_ADMIN_PREVIOUS' },
-  { role: 'approver', current: 'API_KEY_APPROVER', previous: 'API_KEY_APPROVER_PREVIOUS' },
+  { role: 'agent', current: 'API_KEY_AGENT', previous: 'API_KEY_AGENT_PREVIOUS', owner: 'API_KEY_AGENT_OWNER_ID' },
+  { role: 'adapter-goat', current: 'API_KEY_ADAPTER_GOAT', previous: 'API_KEY_ADAPTER_GOAT_PREVIOUS', owner: 'API_KEY_ADAPTER_GOAT_OWNER_ID' },
+  { role: 'adapter-qatom', current: 'API_KEY_ADAPTER_QATOM', previous: 'API_KEY_ADAPTER_QATOM_PREVIOUS', owner: 'API_KEY_ADAPTER_QATOM_OWNER_ID' },
+  { role: 'dashboard', current: 'API_KEY_DASHBOARD', previous: 'API_KEY_DASHBOARD_PREVIOUS', owner: 'API_KEY_DASHBOARD_OWNER_ID' },
+  { role: 'admin', current: 'API_KEY_ADMIN', previous: 'API_KEY_ADMIN_PREVIOUS', owner: 'API_KEY_ADMIN_OWNER_ID' },
+  { role: 'approver', current: 'API_KEY_APPROVER', previous: 'API_KEY_APPROVER_PREVIOUS', owner: 'API_KEY_APPROVER_OWNER_ID' },
 ] as const;
 
 const MIN_PRODUCTION_SECRET_LENGTH = 32;
