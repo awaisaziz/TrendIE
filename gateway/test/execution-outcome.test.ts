@@ -7,7 +7,7 @@ import { canTransition, sameOutcome } from '../src/executions/state.js';
 import type { PaymentResult } from '../src/schemas/contracts.js';
 
 const payment: PaymentResult = { executionId: 'exec-test', platform: 'qatom', status: 'succeeded', txHashOrCheckoutRef: 'synthetic-receipt', error: null, evidence: { checked: true } };
-const approved = { id: 'approval-test', consumed_at: new Date(), consumed_platform: 'qatom' };
+const approved = { id: 'approval-test', owner_id: 'owner_alice', consumed_at: new Date(), consumed_platform: 'qatom' };
 
 async function postResult(options: { approval?: object | null; existing?: object; body?: PaymentResult; key?: string; auditFailure?: boolean } = {}) {
   const query = vi.fn(async (sql: string) => {

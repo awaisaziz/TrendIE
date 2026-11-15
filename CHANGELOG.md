@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-11-15 — Qatom authority, owner-scoped history, live-gateway comparison
+
+- Qatom authority V1 on the gateway: claim, outcome, one atomic continuation per provider
+  approval, and read-only recovery under `/v1/qatom/...`. It uses the same rules as GOAT: exact
+  persisted proposal and shared fingerprint, approval HMAC, owner from the key, immutable terminal
+  results and provider reference, and a success only with a receipt that matches the approved
+  item and money. `QATOM_SPEND_CEILING` defaults to 0 (blocked); `QATOM_DAILY_LIMIT` is optional.
+- `packages/qatom` HTTP authority client works in `mode: 'active'` with strict response checks.
+  The default stays `disabled`. Live checkout still needs provider access and a verified price bound.
+- Every owner-visible gateway route takes the owner only from the key binding and filters by it in
+  SQL. An `owner` query value must match the key. History aliases share handlers instead of
+  `fastify.inject`.
+- The web attack comparison asks the live gateway when it is configured, shows the gateway decision
+  id, and fails instead of falling back when the gateway errors. Without any gateway configuration
+  it uses the fixture policy, labelled in the UI. The fixture now uses USDC (scale 6).
+- Offline tests only. PostgreSQL behavior and live Qatom checkout are not verified.
+
 ## 2026-11-15 — GOAT authority V1 hardening
 
 - Claim compares the request proposal with the persisted, signed proposal and recomputes the

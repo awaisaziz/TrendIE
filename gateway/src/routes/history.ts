@@ -2,36 +2,38 @@ import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { pool } from '../db/client.js';
 import { requireRole } from '../auth/plugin.js';
+import { ownerOf, requireOwner } from '../auth/owner.js';
 import { normalizeStatus } from '../executions/state.js';
 
 const HistoryQuerySchema = z.object({
-  owner: z.string().min(1).max(128),
+  owner: z.string().min(1).max(128).optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   offset: z.coerce.number().int().min(0).default(0),
 });
 
 const ReviewQueueQuerySchema = z.object({
-  owner: z.string().min(1).max(128),
+  owner: z.string().min(1).max(128).optional(),
 });
 
 export const historyRoutes: FastifyPluginAsync = async (fastify) => {
   // GET /history/decisions — Owner-scoped decision history
-  fastify.get(
-    '/history/decisions',
+  for (const path of ['/history/decisions', '/decisions']) fastify.get(
+    path,
     {
-      preHandler: [requireRole('dashboard', 'admin')],
+      preHandler: [requireRole('dashboard', 'admin'), requireOwner],
     },
     async (req, reply) => {
       const parsed = HistoryQuerySchema.safeParse(req.query);
       if (!parsed.success) {
         return reply.status(400).send({
           error: 'SCHEMA_INVALID',
-          message: 'Invalid query parameters. "owner" is required.',
+          message: 'Invalid query parameters.',
           details: parsed.error.format(),
         });
       }
 
-      const { owner, limit, offset } = parsed.data;
+      const { limit, offset } = parsed.data;
+      const owner = ownerOf(req);
 
       try {
         const query = `
@@ -106,44 +108,25 @@ export const historyRoutes: FastifyPluginAsync = async (fastify) => {
     }
   );
 
-  // Alias: GET /decisions — also routes to owner-scoped decision listing
-  fastify.get(
-    '/decisions',
-    {
-      preHandler: [requireRole('dashboard', 'admin')],
-    },
-    async (req, reply) => {
-      const owner = (req.query as { owner?: string }).owner;
-      if (!owner) {
-        return reply.status(400).send({ error: 'OWNER_REQUIRED', message: 'owner query parameter is required' });
-      }
-      return fastify.inject({
-        method: 'GET',
-        url: `/history/decisions?owner=${encodeURIComponent(owner)}`,
-        headers: {
-          'x-api-key': req.headers['x-api-key'] as string || '',
-        },
-      }).then((res) => reply.status(res.statusCode).send(res.json()));
-    }
-  );
 
   // GET /history/executions — Owner-scoped execution history
   fastify.get(
     '/history/executions',
     {
-      preHandler: [requireRole('dashboard', 'admin')],
+      preHandler: [requireRole('dashboard', 'admin'), requireOwner],
     },
     async (req, reply) => {
       const parsed = HistoryQuerySchema.safeParse(req.query);
       if (!parsed.success) {
         return reply.status(400).send({
           error: 'SCHEMA_INVALID',
-          message: 'Invalid query parameters. "owner" is required.',
+          message: 'Invalid query parameters.',
           details: parsed.error.format(),
         });
       }
 
-      const { owner, limit, offset } = parsed.data;
+      const { limit, offset } = parsed.data;
+      const owner = ownerOf(req);
 
       try {
         const query = `
@@ -206,22 +189,22 @@ export const historyRoutes: FastifyPluginAsync = async (fastify) => {
   );
 
   // GET /history/review-queue — Human review queue filtered by owner
-  fastify.get(
-    '/history/review-queue',
+  for (const path of ['/history/review-queue', '/reviews']) fastify.get(
+    path,
     {
-      preHandler: [requireRole('dashboard', 'admin')],
+      preHandler: [requireRole('dashboard', 'admin'), requireOwner],
     },
     async (req, reply) => {
       const parsed = ReviewQueueQuerySchema.safeParse(req.query);
       if (!parsed.success) {
         return reply.status(400).send({
           error: 'SCHEMA_INVALID',
-          message: 'Invalid query parameters. "owner" is required.',
+          message: 'Invalid query parameters.',
           details: parsed.error.format(),
         });
       }
 
-      const { owner } = parsed.data;
+      const owner = ownerOf(req);
 
       try {
         const query = `
@@ -281,24 +264,4 @@ export const historyRoutes: FastifyPluginAsync = async (fastify) => {
     }
   );
 
-  // Alias: GET /reviews — also lists pending reviews by owner
-  fastify.get(
-    '/reviews',
-    {
-      preHandler: [requireRole('dashboard', 'admin')],
-    },
-    async (req, reply) => {
-      const owner = (req.query as { owner?: string }).owner;
-      if (!owner) {
-        return reply.status(400).send({ error: 'OWNER_REQUIRED', message: 'owner query parameter is required' });
-      }
-      return fastify.inject({
-        method: 'GET',
-        url: `/history/review-queue?owner=${encodeURIComponent(owner)}`,
-        headers: {
-          'x-api-key': req.headers['x-api-key'] as string || '',
-        },
-      }).then((res) => reply.status(res.statusCode).send(res.json()));
-    }
-  );
 };

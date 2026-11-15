@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { PaymentResultSchema } from '../schemas/index.js';
 import { pool, withTransaction } from '../db/client.js';
 import { requireRole } from '../auth/plugin.js';
+import { ownerOf, requireOwner } from '../auth/owner.js';
 import { appendAuditLog } from '../audit/hashChain.js';
 import { canTransition, normalizeStatus, sameOutcome, validOutcome } from '../executions/state.js';
 
@@ -17,7 +18,7 @@ export const executionRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     '/executions',
     {
-      preHandler: [requireRole('dashboard', 'admin')],
+      preHandler: [requireRole('dashboard', 'admin'), requireOwner],
     },
     async (req, reply) => {
       const parsed = ExecutionsQuerySchema.safeParse(req.query);
@@ -29,7 +30,8 @@ export const executionRoutes: FastifyPluginAsync = async (fastify) => {
         });
       }
 
-      const { owner, limit, offset } = parsed.data;
+      const { limit, offset } = parsed.data;
+      const owner = ownerOf(req);
 
       try {
         let query = `
@@ -88,7 +90,7 @@ export const executionRoutes: FastifyPluginAsync = async (fastify) => {
     }
   );
 
-  fastify.post('/executions/:id/result', { preHandler: [requireRole('adapter-goat', 'adapter-qatom', 'admin')] }, async (req, reply) => {
+  fastify.post('/executions/:id/result', { preHandler: [requireRole('adapter-goat', 'adapter-qatom', 'admin'), requireOwner] }, async (req, reply) => {
     const { id } = req.params as { id: string };
     const parsed = PaymentResultSchema.safeParse(req.body);
     if (!parsed.success) return reply.status(400).send({ error: 'SCHEMA_INVALID', message: 'Invalid payment result payload', details: parsed.error.format() });
@@ -100,6 +102,7 @@ export const executionRoutes: FastifyPluginAsync = async (fastify) => {
         const ar = await client.query('SELECT * FROM approvals WHERE execution_id = $1 FOR UPDATE', [id]);
         if (!ar.rows.length) return { code: 404, error: 'APPROVAL_NOT_FOUND' };
         const approval = ar.rows[0];
+        if (approval.owner_id !== ownerOf(req)) return { code: 404, error: 'APPROVAL_NOT_FOUND' };
         if (!approval.consumed_at) return { code: 403, error: 'APPROVAL_NOT_CONSUMED' };
         if (!approval.consumed_platform || approval.consumed_platform !== payment.platform || (rolePlatform && rolePlatform !== approval.consumed_platform)) return { code: 403, error: 'PLATFORM_MISMATCH' };
         const er = await client.query('SELECT * FROM executions WHERE execution_id = $1 FOR UPDATE', [id]);
@@ -127,12 +130,18 @@ export const executionRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     '/executions/:id',
     {
-      preHandler: [requireRole('adapter-goat', 'adapter-qatom', 'dashboard', 'admin')],
+      preHandler: [requireRole('adapter-goat', 'adapter-qatom', 'dashboard', 'admin'), requireOwner],
     },
     async (req, reply) => {
       const { id } = req.params as { id: string };
       try {
-        const res = await pool.query('SELECT * FROM executions WHERE execution_id = $1', [id]);
+        const res = await pool.query(
+          `SELECT e.* FROM executions e
+           JOIN approvals a ON a.id = e.approval_id
+           LEFT JOIN intents i ON i.id = a.intent_id
+           WHERE e.execution_id = $1 AND COALESCE(e.owner_id, a.owner_id, i.owner) = $2`,
+          [id, ownerOf(req)]
+        );
         if (!res.rows.length) {
           return reply.status(404).send({ error: 'EXECUTION_NOT_FOUND', message: 'Execution not found' });
         }

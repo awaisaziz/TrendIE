@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { IntentSchema } from '../schemas/index.js';
 import { pool, withTransaction } from '../db/client.js';
 import { requireRole } from '../auth/plugin.js';
+import { ownerOf, requireOwner } from '../auth/owner.js';
 import { appendAuditLog } from '../audit/hashChain.js';
 
 export const intentRoutes: FastifyPluginAsync = async (fastify) => {
@@ -9,7 +10,7 @@ export const intentRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post(
     '/intents',
     {
-      preHandler: [requireRole('dashboard', 'admin')],
+      preHandler: [requireRole('dashboard', 'admin'), requireOwner],
     },
     async (req, reply) => {
       const parseResult = IntentSchema.safeParse(req.body);
@@ -22,6 +23,9 @@ export const intentRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       const intent = parseResult.data;
+      if (intent.owner !== ownerOf(req)) {
+        return reply.status(403).send({ error: 'OWNER_MISMATCH', message: 'Intent owner does not match the API key' });
+      }
 
       try {
         await withTransaction(async (client) => {
@@ -74,11 +78,11 @@ export const intentRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     '/intents/:id',
     {
-      preHandler: [requireRole('dashboard', 'admin')],
+      preHandler: [requireRole('dashboard', 'admin'), requireOwner],
     },
     async (req, reply) => {
       const { id } = req.params as { id: string };
-      const res = await pool.query('SELECT * FROM intents WHERE id = $1', [id]);
+      const res = await pool.query('SELECT * FROM intents WHERE id = $1 AND owner = $2', [id, ownerOf(req)]);
       if (res.rows.length === 0) {
         return reply.status(404).send({ error: 'INTENT_NOT_FOUND', message: 'Intent not found' });
       }

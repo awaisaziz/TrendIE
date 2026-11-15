@@ -27,6 +27,9 @@ const baseEnv: Record<string, string | undefined> = {
   API_KEY_ADAPTER_QATOM: strong('qatom'),
   API_KEY_DASHBOARD: strong('dashboard'),
   API_KEY_ADMIN: strong('admin'),
+  API_KEY_DASHBOARD_OWNER_ID: 'owner_alice',
+  API_KEY_ADMIN_OWNER_ID: 'owner_alice',
+  API_KEY_AGENT_OWNER_ID: 'owner_alice',
 };
 
 const prodEnv = { ...baseEnv, NODE_ENV: 'production', TEST_DATABASE_URL: undefined, DATABASE_URL: 'postgresql://fake@127.0.0.1:5432/gateway' };
@@ -216,7 +219,7 @@ describe('gateway credential enforcement (offline)', () => {
   it('does not let the dashboard key resolve reviews', async () => {
     const connect = vi.spyOn(pool, 'connect');
     const approver = strong('approver');
-    const app = await buildServer(cfg({ API_KEY_APPROVER: approver }));
+    const app = await buildServer(cfg({ API_KEY_APPROVER: approver, API_KEY_APPROVER_OWNER_ID: 'owner_alice' }));
     const payload = { resolution: 'approve', notes: 'synthetic review' };
     try {
       const dashboard = await app.inject({ method: 'POST', url: '/reviews/dec_x/resolve', headers: { 'x-api-key': baseEnv.API_KEY_DASHBOARD! }, payload });
@@ -229,7 +232,7 @@ describe('gateway credential enforcement (offline)', () => {
 
   it('does not let the approver key create intents', async () => {
     const approver = strong('approver');
-    const app = await buildServer(cfg({ API_KEY_APPROVER: approver }));
+    const app = await buildServer(cfg({ API_KEY_APPROVER: approver, API_KEY_APPROVER_OWNER_ID: 'owner_alice' }));
     try {
       const res = await app.inject({ method: 'POST', url: '/intents', headers: { 'x-api-key': approver }, payload: {} });
       expect(res.statusCode).toBe(403);

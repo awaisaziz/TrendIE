@@ -1,11 +1,10 @@
-import { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
+import { FastifyPluginAsync } from 'fastify';
 import type pg from 'pg';
 import { z } from 'zod';
 import { pool, withTransaction } from '../db/client.js';
 import { requireRole } from '../auth/plugin.js';
 import { appendAuditLog } from '../audit/hashChain.js';
 import { isIntentActive } from '../approvals/expiry.js';
-import { verifyHmacSignature } from '../approvals/token.js';
 import { config as defaultConfig, type Config } from '../config.js';
 import {
   AuthorityError,
@@ -24,6 +23,7 @@ import {
   v1Fingerprint,
   type GoatProposalV1,
 } from '../authority/goat.js';
+import { epochMs, iso, lockOwnedExecution, principalOwner, sendError, verifyApprovalSignature, type Row } from '../authority/routeHelpers.js';
 
 const boundedId = z.string().min(1).max(128);
 
@@ -62,48 +62,6 @@ const OutcomeBodySchema = z
   })
   .strict();
 
-type Row = Record<string, unknown>;
-
-function iso(value: unknown): string {
-  return value instanceof Date ? value.toISOString() : new Date(String(value)).toISOString();
-}
-
-function epochMs(value: unknown): number {
-  return value instanceof Date ? value.getTime() : new Date(String(value)).getTime();
-}
-
-/** The owner comes only from the server-configured key binding. */
-function principalOwner(req: FastifyRequest): string {
-  if (!req.callerOwnerId) throw new AuthorityError(403, 'OWNER_UNBOUND');
-  return req.callerOwnerId;
-}
-
-function sendError(req: FastifyRequest, reply: FastifyReply, err: unknown) {
-  if (err instanceof AuthorityError) return reply.status(err.statusCode).send(errorBody(err.code));
-  req.log.error({ err }, 'GOAT authority persistence failed');
-  return reply.status(503).send(errorBody('AUTHORITY_UNAVAILABLE'));
-}
-
-function verifyApprovalSignature(approval: Row): boolean {
-  return verifyHmacSignature(
-    {
-      approvalId: String(approval.id),
-      executionId: String(approval.execution_id),
-      proposalHash: String(approval.proposal_hash),
-      intentId: String(approval.intent_id),
-      expiresAt: iso(approval.expires_at),
-      ownerId: (approval.owner_id as string | null) ?? undefined,
-      intentVersion: (approval.intent_version as number | null) ?? undefined,
-      platform: (approval.bound_platform as string | null) ?? undefined,
-      chain: (approval.bound_chain as string | null) ?? undefined,
-      asset: (approval.bound_asset as string | null) ?? undefined,
-      scale: approval.bound_scale !== null && approval.bound_scale !== undefined ? Number(approval.bound_scale) : undefined,
-    },
-    String(approval.hmac_signature ?? ''),
-    String(approval.key_id ?? '')
-  );
-}
-
 async function loadStoredProposal(client: Pick<pg.PoolClient, 'query'>, approval: Row): Promise<GoatProposalV1> {
   const res = await client.query(
     'SELECT p.raw_payload FROM proposals p JOIN decisions d ON d.proposal_id = p.id WHERE d.id = $1',
@@ -130,23 +88,6 @@ function bindingFor(proposal: GoatProposalV1, approval: Row, sender: string, spe
     spendAuthorizationId,
     spendCeilingWei,
   };
-}
-
-/** Loads a GOAT execution scoped in SQL to the authenticated owner. */
-async function lockOwnedExecution(client: pg.PoolClient, executionId: string, ownerId: string): Promise<Row> {
-  const res = await client.query(
-    `SELECT e.*, a.consumed_at AS approval_consumed_at, a.consumed_platform AS approval_consumed_platform
-       FROM executions e
-       JOIN approvals a ON a.id = e.approval_id
-      WHERE e.execution_id = $1 AND e.owner_id = $2 AND e.platform = 'goat'
-      FOR UPDATE OF e`,
-    [executionId, ownerId]
-  );
-  if (res.rows.length === 0) throw new AuthorityError(404, 'AUTHORITY_NOT_FOUND');
-  const row = res.rows[0];
-  // A claimed execution without a consumed GOAT approval is invalid authority.
-  if (!row.approval_consumed_at || row.approval_consumed_platform !== 'goat') throw new AuthorityError(409, 'AUTHORITY_INCOMPLETE');
-  return row;
 }
 
 const RECOVERY_SELECT = `
@@ -291,7 +232,7 @@ export function createGoatAuthorityRoutes(cfg: Pick<Config, 'GOAT_SPEND_AUTHORIZ
       try {
         const ownerId = principalOwner(req);
         await withTransaction(async (client) => {
-          const row = await lockOwnedExecution(client, executionId, ownerId);
+          const row = await lockOwnedExecution(client, executionId, ownerId, 'goat');
           const write = checkpointChange(
             {
               phase: (row.checkpoint_phase as 'signed' | 'broadcast' | null) ?? null,
@@ -337,7 +278,7 @@ export function createGoatAuthorityRoutes(cfg: Pick<Config, 'GOAT_SPEND_AUTHORIZ
       try {
         const ownerId = principalOwner(req);
         await withTransaction(async (client) => {
-          const row = await lockOwnedExecution(client, executionId, ownerId);
+          const row = await lockOwnedExecution(client, executionId, ownerId, 'goat');
           const write = outcomeChange(
             {
               status: String(row.status),

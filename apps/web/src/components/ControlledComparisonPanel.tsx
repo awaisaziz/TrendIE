@@ -59,7 +59,7 @@ export function ControlledComparisonPanel({ result, scenario, busy, error, onRun
                 {result.protectedPolicy.reasons.map((reason, index) => <li key={`${reason}-${index}`}>{reason}</li>)}
               </ul>
               <p className={styles.outcome}><strong>Payment outcome:</strong> {result.protectedPolicy.outcome}</p>
-              <p className={styles.note}>Demo policy run on test data.</p>
+              <p className={styles.note}>{result.protectedPolicy.source === 'gateway' ? <>Decided by the live gateway · <code>{result.protectedPolicy.decisionId}</code></> : 'Gateway not connected. Demo policy on test data.'}</p>
             </article>
           </div>
 

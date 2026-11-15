@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { pool } from '../db/client.js';
 import { requireRole } from '../auth/plugin.js';
+import { ownerOf, requireOwner } from '../auth/owner.js';
 import { verifyAuditChain } from '../audit/verifyChain.js';
 
 export const auditRoutes: FastifyPluginAsync = async (fastify) => {
@@ -9,24 +10,32 @@ export const auditRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     '/audit',
     {
-      preHandler: [requireRole('dashboard', 'admin')],
+      preHandler: [requireRole('dashboard', 'admin'), requireOwner],
     },
     async (req, reply) => {
       const { intentId } = req.query as { intentId?: string };
+      const owner = ownerOf(req);
 
       if (intentId) {
-        // Find audit entries related to this intent or its decisions/approvals
+        // Only entries for an intent this owner holds.
         const res = await pool.query(
-          `SELECT * FROM audit_log
-           WHERE (entity_type = 'intent' AND entity_id = $1)
-              OR (payload->>'intentId' = $1)
-           ORDER BY id ASC`,
-          [intentId]
+          `SELECT a.* FROM audit_log a
+           WHERE EXISTS (SELECT 1 FROM intents i WHERE i.id = $1 AND i.owner = $2)
+             AND ((a.entity_type = 'intent' AND a.entity_id = $1) OR (a.payload->>'intentId' = $1))
+           ORDER BY a.id ASC`,
+          [intentId, owner]
         );
         return reply.status(200).send(res.rows);
       }
 
-      const res = await pool.query('SELECT * FROM audit_log ORDER BY id ASC LIMIT 100');
+      const res = await pool.query(
+        `SELECT a.* FROM audit_log a
+         WHERE a.payload->>'ownerId' = $1
+            OR (a.entity_type = 'intent' AND a.entity_id IN (SELECT id FROM intents WHERE owner = $1))
+            OR (a.payload->>'intentId' IN (SELECT id FROM intents WHERE owner = $1))
+         ORDER BY a.id ASC LIMIT 100`,
+        [owner]
+      );
       return reply.status(200).send(res.rows);
     }
   );
@@ -48,7 +57,7 @@ export const auditRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     '/intents',
     {
-      preHandler: [requireRole('dashboard', 'admin')],
+      preHandler: [requireRole('dashboard', 'admin'), requireOwner],
     },
     async (req, reply) => {
       const parsed = z.object({
@@ -57,18 +66,11 @@ export const auditRoutes: FastifyPluginAsync = async (fastify) => {
         owner: z.string().min(1).max(128).optional(),
       }).strict().safeParse(req.query);
       if (!parsed.success) return reply.status(400).send({ error: 'SCHEMA_INVALID', message: 'Invalid pagination' });
-      const { limit, offset, owner } = parsed.data;
-
-      let query = 'SELECT * FROM intents';
-      const params: unknown[] = [];
-      if (owner) {
-        query += ' WHERE owner = $1';
-        params.push(owner);
-      }
-      query += ` ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-      params.push(limit, offset);
-
-      const res = await pool.query(query, params);
+      const { limit, offset } = parsed.data;
+      const res = await pool.query(
+        'SELECT * FROM intents WHERE owner = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3',
+        [ownerOf(req), limit, offset]
+      );
 
       const intents = res.rows.map((row) => ({
         id: row.id,
@@ -97,11 +99,17 @@ export const auditRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     '/decisions/:id',
     {
-      preHandler: [requireRole('dashboard', 'admin')],
+      preHandler: [requireRole('dashboard', 'admin'), requireOwner],
     },
     async (req, reply) => {
       const { id } = req.params as { id: string };
-      const res = await pool.query('SELECT * FROM decisions WHERE id = $1', [id]);
+      const res = await pool.query(
+        `SELECT d.* FROM decisions d
+         JOIN proposals p ON p.id = d.proposal_id
+         JOIN intents i ON i.id = p.intent_id
+         WHERE d.id = $1 AND i.owner = $2`,
+        [id, ownerOf(req)]
+      );
 
       if (res.rows.length === 0) {
         return reply.status(404).send({ error: 'DECISION_NOT_FOUND', message: 'Decision not found' });

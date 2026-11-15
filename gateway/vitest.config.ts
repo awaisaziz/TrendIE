@@ -15,6 +15,11 @@ export default defineConfig({
       API_KEY_ADAPTER_QATOM: process.env.API_KEY_ADAPTER_QATOM || 'unit-qatom',
       API_KEY_DASHBOARD: process.env.API_KEY_DASHBOARD || 'unit-dashboard',
       API_KEY_ADMIN: process.env.API_KEY_ADMIN || 'unit-admin',
+      API_KEY_AGENT_OWNER_ID: 'owner_alice',
+      API_KEY_ADAPTER_GOAT_OWNER_ID: 'owner_alice',
+      API_KEY_ADAPTER_QATOM_OWNER_ID: 'owner_alice',
+      API_KEY_DASHBOARD_OWNER_ID: 'owner_alice',
+      API_KEY_ADMIN_OWNER_ID: 'owner_alice',
       TEST_SUITE: process.env.TEST_SUITE || 'unit',
     },
     include: process.env.TEST_SUITE === 'integration'

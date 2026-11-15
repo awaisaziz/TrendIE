@@ -890,7 +890,10 @@ function isControlledComparisonResult(value: unknown): value is ControlledCompar
     action.recipient === value.proposal.recipient && action.amount === value.proposal.amount &&
     action.scale === value.proposal.scale && action.asset === value.proposal.asset &&
     value.vulnerableSimulation.executed === false && value.vulnerableSimulation.providerDispatch === false &&
-    (policy.decision === 'approve' || policy.decision === 'reject') && Array.isArray(policy.reasons) &&
+    (policy.decision === 'approve' || policy.decision === 'reject' || policy.decision === 'review') && Array.isArray(policy.reasons) &&
+    (policy.source === 'gateway' || policy.source === 'fixture') &&
+    (policy.decisionId === undefined || typeof policy.decisionId === 'string') &&
+    (policy.source !== 'gateway' || typeof policy.decisionId === 'string') &&
     policy.reasons.length > 0 && policy.reasons.every((reason) => typeof reason === 'string') &&
     policy.providerDispatch === false && policy.outcome === 'NOT_SETTLED';
 }

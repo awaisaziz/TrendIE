@@ -45,6 +45,10 @@ const envSchema = z.object({
   // Rolling 24-hour GOAT spend limit per owner, in wei. Empty means no daily limit beyond the ceiling.
   // Pending and unknown executions count as spent until they resolve.
   GOAT_DAILY_LIMIT_WEI: z.preprocess((value) => (value === '' ? undefined : value), z.string().regex(/^[1-9][0-9]{0,37}$/, 'GOAT_DAILY_LIMIT_WEI must be a positive integer').optional()),
+  // Qatom USD-TDN limits in minor units (scale 3, so 1000 = 1.000 USD-TDN). Ceiling 0 (default)
+  // blocks every Qatom claim. The daily limit is optional; pending and unknown count as spent.
+  QATOM_SPEND_CEILING: z.string().regex(/^(0|[1-9][0-9]{0,37})$/, 'QATOM_SPEND_CEILING must be a non-negative integer').default('0'),
+  QATOM_DAILY_LIMIT: z.preprocess((value) => (value === '' ? undefined : value), z.string().regex(/^[1-9][0-9]{0,37}$/, 'QATOM_DAILY_LIMIT must be a positive integer').optional()),
   GOAT_SPEND_CEILING_WEI: z.string().regex(/^(0|[1-9][0-9]{0,37})$/, 'GOAT_SPEND_CEILING_WEI must be a non-negative integer').default('0'),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
   RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().int().positive().default(60),

@@ -10,6 +10,7 @@ import { auditRoutes } from './routes/audit.js';
 import { reviewRoutes } from './routes/reviews.js';
 import { historyRoutes } from './routes/history.js';
 import { goatAuthorityRoutes } from './routes/goatAuthority.js';
+import { qatomAuthorityRoutes } from './routes/qatomAuthority.js';
 
 // Credentials must never reach logs, whichever serializer or error object carries them.
 const REDACTED_LOG_PATHS = [
@@ -54,6 +55,7 @@ export async function buildServer(appConfig: Config = defaultConfig): Promise<Fa
   await app.register(reviewRoutes);
   await app.register(historyRoutes);
   await app.register(goatAuthorityRoutes);
+  await app.register(qatomAuthorityRoutes);
 
   return app;
 }

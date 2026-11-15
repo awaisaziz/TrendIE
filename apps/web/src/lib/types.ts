@@ -82,9 +82,12 @@ export type ControlledComparisonResult = {
     providerDispatch: false;
   };
   protectedPolicy: {
-    decision: 'approve' | 'reject';
+    decision: 'approve' | 'reject' | 'review';
     reasons: string[];
     providerDispatch: false;
     outcome: 'NOT_SETTLED';
+    /** `gateway` when the live gateway decided; `fixture` only when no gateway is configured. */
+    source: 'gateway' | 'fixture';
+    decisionId?: string;
   };
 };

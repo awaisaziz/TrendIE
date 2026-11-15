@@ -147,15 +147,16 @@ describe('Authority & History Endpoints (Awais Gateway Integration)', () => {
   });
 
   describe('Owner-Scoped History Endpoints', () => {
-    it('requires owner query param for /history/decisions', async () => {
+    it('refuses another owner named in the query for /history/decisions', async () => {
       const app = await buildServer();
       try {
         const res = await app.inject({
           method: 'GET',
-          url: '/history/decisions',
+          url: '/history/decisions?owner=owner_mallory',
           headers: { 'x-api-key': config.API_KEY_DASHBOARD },
         });
-        expect(res.statusCode).toBe(400);
+        expect(res.statusCode).toBe(403);
+        expect(res.json().error).toBe('OWNER_MISMATCH');
       } finally {
         await app.close();
       }

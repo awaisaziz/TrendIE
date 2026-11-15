@@ -10,6 +10,7 @@ import {
 } from '../schemas/index.js';
 import { withTransaction } from '../db/client.js';
 import { requireRole } from '../auth/plugin.js';
+import { ownerOf, requireOwner } from '../auth/owner.js';
 import { verifyPolicy } from '../policy/verify.js';
 import { appendAuditLog } from '../audit/hashChain.js';
 import { createApprovalId, createExecutionId, generateHmacSignature } from '../approvals/token.js';
@@ -28,7 +29,7 @@ export const verifyRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post(
     '/verify',
     {
-      preHandler: [requireRole('agent', 'admin')],
+      preHandler: [requireRole('agent', 'admin'), requireOwner],
     },
     async (req, reply) => {
       const parseResult = VerifyBodySchema.safeParse(req.body);
@@ -47,7 +48,8 @@ export const verifyRoutes: FastifyPluginAsync = async (fastify) => {
 
       return await withTransaction(async (client) => {
         // 1. Fetch intent
-        const intentRes = await client.query('SELECT * FROM intents WHERE id = $1', [proposal.intentId]);
+        // An intent held by another owner is treated as absent.
+        const intentRes = await client.query('SELECT * FROM intents WHERE id = $1 AND owner = $2', [proposal.intentId, ownerOf(req)]);
         let intent: Intent | null = null;
         if (intentRes.rows.length > 0) {
           const row = intentRes.rows[0];

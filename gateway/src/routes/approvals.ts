@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { PurchaseProposalSchema, proposalHash } from '../schemas/index.js';
 import { pool, withTransaction } from '../db/client.js';
 import { requireRole } from '../auth/plugin.js';
+import { ownerOf, requireOwner } from '../auth/owner.js';
 import { appendAuditLog } from '../audit/hashChain.js';
 import { isIntentActive } from '../approvals/expiry.js';
 import { verifyHmacSignature } from '../approvals/token.js';
@@ -11,7 +12,7 @@ export const approvalRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     '/approvals/:id',
     {
-      preHandler: [requireRole('adapter-goat', 'adapter-qatom', 'dashboard', 'admin')],
+      preHandler: [requireRole('adapter-goat', 'adapter-qatom', 'dashboard', 'admin'), requireOwner],
     },
     async (req, reply) => {
       const { id } = req.params as { id: string };
@@ -25,8 +26,8 @@ export const approvalRoutes: FastifyPluginAsync = async (fastify) => {
                   i.sender as intent_sender
            FROM approvals a
            LEFT JOIN intents i ON a.intent_id = i.id
-           WHERE a.id = $1`,
-          [id]
+           WHERE a.id = $1 AND COALESCE(a.owner_id, i.owner) = $2`,
+          [id, ownerOf(req)]
         );
 
         if (res.rows.length === 0) {
@@ -100,7 +101,7 @@ export const approvalRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post(
     '/approvals/:id/consume',
     {
-      preHandler: [requireRole('adapter-goat', 'adapter-qatom', 'admin')],
+      preHandler: [requireRole('adapter-goat', 'adapter-qatom', 'admin'), requireOwner],
     },
     async (req, reply) => {
       const { id } = req.params as { id: string };
@@ -130,6 +131,9 @@ export const approvalRoutes: FastifyPluginAsync = async (fastify) => {
           }
 
           const approval = aprQuery.rows[0];
+          if ((approval.owner_id ?? null) !== ownerOf(req)) {
+            return { ok: false, reason: 'APPROVAL_NOT_FOUND' };
+          }
           const rolePlatform = req.callerRole === 'adapter-goat' ? 'goat' : req.callerRole === 'adapter-qatom' ? 'qatom' : null;
           if (!rolePlatform || (approval.consumed_platform && approval.consumed_platform !== rolePlatform)) {
             return { ok: false, reason: 'PLATFORM_BINDING_REQUIRED' };

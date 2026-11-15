@@ -2,6 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { withTransaction } from '../db/client.js';
 import { requireRole } from '../auth/plugin.js';
+import { ownerOf, requireOwner } from '../auth/owner.js';
 import { appendAuditLog } from '../audit/hashChain.js';
 import { createApprovalId, createExecutionId, generateHmacSignature } from '../approvals/token.js';
 import { config } from '../config.js';
@@ -23,7 +24,7 @@ export const reviewRoutes: FastifyPluginAsync = async (fastify) => {
   fastify.post(
     '/reviews/:decisionId/resolve',
     {
-      preHandler: [requireRole('approver', 'admin')],
+      preHandler: [requireRole('approver', 'admin'), requireOwner],
     },
     async (req, reply) => {
       const { decisionId } = req.params as { decisionId: string };
@@ -41,7 +42,14 @@ export const reviewRoutes: FastifyPluginAsync = async (fastify) => {
 
       return await withTransaction(async (client) => {
         // Fetch decision
-        const decRes = await client.query('SELECT * FROM decisions WHERE id = $1 FOR UPDATE', [decisionId]);
+        const decRes = await client.query(
+          `SELECT d.* FROM decisions d
+           JOIN proposals p ON p.id = d.proposal_id
+           JOIN intents i ON i.id = p.intent_id
+           WHERE d.id = $1 AND i.owner = $2
+           FOR UPDATE OF d`,
+          [decisionId, ownerOf(req)]
+        );
         if (decRes.rows.length === 0) {
           return reply.status(404).send({ error: 'DECISION_NOT_FOUND', message: 'Decision not found' });
         }

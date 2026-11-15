@@ -58,7 +58,11 @@ export function errorBody(code: string) {
  * (`amount`, `destination`) must agree with the V1 fields. Otherwise the approval does not
  * authorize a V1 GOAT execution. Fails closed; never fills a missing value.
  */
-export function storedV1Proposal(rawPayload: unknown, approvalProposalHash: unknown): GoatProposalV1 {
+/**
+ * Checks a persisted gateway proposal and returns its V1 fields. The stored payload must hash to
+ * the approval's signed `proposal_hash` and carry every V1 field. Fails closed; never fills a value.
+ */
+export function storedV1Fields(rawPayload: unknown, approvalProposalHash: unknown): Record<string, unknown> {
   if (!rawPayload || typeof rawPayload !== 'object' || Array.isArray(rawPayload)) throw new AuthorityError(409, 'AUTHORITY_INCOMPLETE');
   if (typeof approvalProposalHash !== 'string' || proposalHash(rawPayload) !== approvalProposalHash) throw new AuthorityError(409, 'PROPOSAL_MISMATCH');
   const raw = rawPayload as Record<string, unknown>;
@@ -67,10 +71,21 @@ export function storedV1Proposal(rawPayload: unknown, approvalProposalHash: unkn
     if (raw[key] === undefined) throw new AuthorityError(409, 'AUTHORITY_INCOMPLETE');
     projected[key] = raw[key];
   }
-  const parsed = GoatProposalV1Schema.safeParse(projected);
+  const money = raw.money as { amount?: unknown } | undefined;
+  // The legacy amount was what policy checked; it must agree with the V1 money.
+  if (raw.amount !== undefined && String(raw.amount) !== String(money?.amount)) throw new AuthorityError(409, 'PROPOSAL_MISMATCH');
+  return projected;
+}
+
+/**
+ * GOAT profile of `storedV1Fields`. The legacy `destination` policy field must also agree with the
+ * V1 recipient. Otherwise the approval does not authorize a V1 GOAT execution.
+ */
+export function storedV1Proposal(rawPayload: unknown, approvalProposalHash: unknown): GoatProposalV1 {
+  const parsed = GoatProposalV1Schema.safeParse(storedV1Fields(rawPayload, approvalProposalHash));
   if (!parsed.success) throw new AuthorityError(409, 'AUTHORITY_INCOMPLETE');
   const proposal = parsed.data;
-  if (raw.amount !== undefined && String(raw.amount) !== proposal.money.amount) throw new AuthorityError(409, 'PROPOSAL_MISMATCH');
+  const raw = rawPayload as Record<string, unknown>;
   if (raw.destination !== undefined && String(raw.destination).toLowerCase() !== proposal.providerArgs.recipient.toLowerCase()) {
     throw new AuthorityError(409, 'PROPOSAL_MISMATCH');
   }
