@@ -1,4 +1,4 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { inspectPdf } from '../../../../services/pdf-inspection/inspect.mjs';
@@ -164,6 +164,29 @@ async function readBoundedRequest(request: Request, maxBytes: number): Promise<B
 }
 
 async function runPdfInspector(filePath: string): Promise<unknown> {
+  const serviceUrl = process.env.PDF_INSPECTION_URL?.trim();
+  if (serviceUrl) {
+    // Deployed on Vercel: the internal pdf-inspection service (bound via PDF_INSPECTION_URL) does the extraction.
+    try {
+      const base = serviceUrl.endsWith('/') ? serviceUrl : `${serviceUrl}/`;
+      const response = await fetch(new URL('inspect', base), {
+        method: 'POST',
+        headers: { 'content-type': 'application/pdf', accept: 'application/json' },
+        body: new Uint8Array(await readFile(filePath)),
+        cache: 'no-store',
+        redirect: 'error',
+        signal: AbortSignal.timeout(INSPECTOR_TIMEOUT_MS * 2),
+      });
+      if (!response.ok) throw new Error('inspection service rejected the PDF');
+      const length = Number(response.headers.get('content-length') ?? '0');
+      if (Number.isFinite(length) && length > 1_000_000) throw new Error('inspection response too large');
+      const text = await response.text();
+      if (text.length > 1_000_000) throw new Error('inspection response too large');
+      return JSON.parse(text) as unknown;
+    } catch {
+      throw new PdfUploadError(422, 'PDF extraction failed or exceeded its resource limits. Encrypted and unsupported PDFs are rejected.');
+    }
+  }
   try {
     return await inspectPdf({
       path: basename(filePath),

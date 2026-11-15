@@ -10,12 +10,22 @@
           "service": "gateway",
           "format": "url",
           "env": "GATEWAY_BASE_URL"
+        },
+        {
+          "type": "service",
+          "service": "pdf-inspection",
+          "format": "url",
+          "env": "PDF_INSPECTION_URL"
         }
       ]
     },
     "gateway": {
       "root": "gateway",
       "framework": "fastify"
+    },
+    "pdf-inspection": {
+      "root": "services/pdf-inspection",
+      "runtime": "python"
     }
   },
   "rewrites": [

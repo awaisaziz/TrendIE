@@ -17,7 +17,11 @@ def inspect(path: Path) -> dict:
     started = time.monotonic()
     if path.stat().st_size > MAX_BYTES:
         raise ValueError("file byte limit exceeded")
-    data = path.read_bytes()
+    return inspect_bytes(path.read_bytes(), started)
+
+
+def inspect_bytes(data: bytes, started: float | None = None) -> dict:
+    started = time.monotonic() if started is None else started
     if len(data) > MAX_BYTES or not data.startswith(b"%PDF-"):
         raise ValueError("invalid or oversized PDF")
     doc = pymupdf.open(stream=data, filetype="pdf")
