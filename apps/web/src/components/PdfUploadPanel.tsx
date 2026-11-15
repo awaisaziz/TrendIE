@@ -84,10 +84,9 @@ export function PdfUploadPanel({ intent, disabled = false, onBusyChange, onVerif
     <section className="pdf-upload panel" aria-labelledby="pdf-upload-title">
       <div className="pdf-upload-heading">
         <div>
-          <h2 id="pdf-upload-title">Inspect a PDF invoice</h2>
-          <p>Text-layer extraction only. The PDF is removed after inspection. The gateway checks the selected authorization’s exact terms; invoice amounts are not inferred and no payment is submitted.</p>
+          <h2 id="pdf-upload-title">Check a PDF invoice</h2>
+          <p>Finds hidden instructions in the text. The file is deleted right after.</p>
         </div>
-        <span className="pdf-local-pill">Local inspection</span>
       </div>
       <form className="pdf-upload-form" onSubmit={(event) => void inspectAndVerify(event)}>
         <label className="pdf-file-label" htmlFor="invoice-pdf">Choose invoice PDF</label>
@@ -98,9 +97,9 @@ export function PdfUploadPanel({ intent, disabled = false, onBusyChange, onVerif
           disabled={disabled || busy}
           onChange={(event) => { setFile(event.target.files?.[0] ?? null); setError(''); setResult(null); }}
         />
-        <p className="form-hint">Maximum 5 MB and 20 pages. Encrypted or unsupported files are rejected.</p>
+        <p className="form-hint">Up to 5 MB, 20 pages.</p>
         <button className="secondary-btn" type="submit" disabled={disabled || busy || !file}>
-          {busy ? 'Extracting and checking…' : 'Extract text and verify'}
+          {busy ? 'Checking…' : 'Check PDF'}
         </button>
       </form>
       {error && <p className="error-banner pdf-upload-message" role="alert">{error}</p>}
@@ -116,7 +115,7 @@ export function PdfUploadPanel({ intent, disabled = false, onBusyChange, onVerif
             <ul className="finding-list">{result.verification.inspection.findings.map((finding, index) => <li key={`${finding.code}-${index}`}><code>{finding.code}</code> — {finding.excerpt}</li>)}</ul>
           )}
           <details>
-            <summary>View extracted text and limitations</summary>
+            <summary>Extracted text</summary>
             <pre className="evidence-text">{result.extraction.text || 'No text was found in this PDF.'}</pre>
             <ul className="pdf-limitations">{result.extraction.limitations.map((limitation) => <li key={limitation}>{limitation}</li>)}</ul>
             <p className="evidence-foot">{result.verification.inspection.caveat}</p>

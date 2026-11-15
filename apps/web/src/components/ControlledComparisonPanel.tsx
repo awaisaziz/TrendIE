@@ -21,50 +21,50 @@ export function ControlledComparisonPanel({ result, scenario, busy, error, onRun
     <section className={`panel ${styles.panel}`} aria-labelledby="controlled-comparison-title">
       <div className={styles.header}>
         <div>
-          <h2 id="controlled-comparison-title">Attack comparison</h2>
-          <p>The same malicious listing is used in both runs; the compliant proposal stays within its stated terms.</p>
+          <h2 id="controlled-comparison-title">Watch it stop an attack</h2>
+          <p>A listing tells the agent to pay someone else. Left: what an unguarded agent would do. Right: what Sentinel does.</p>
         </div>
         <div className={styles.actions}>
-          <button type="button" className="secondary-btn" onClick={() => onRun('attack')} disabled={busy}>
-            {busy && scenario === 'attack' ? 'Running…' : 'Run attack fixture'}
+          <button type="button" className="primary-btn" onClick={() => onRun('attack')} disabled={busy}>
+            {busy && scenario === 'attack' ? 'Running…' : 'Run the attack'}
           </button>
           <button type="button" className="secondary-btn" onClick={() => onRun('clean')} disabled={busy}>
-            {busy && scenario === 'clean' ? 'Running…' : 'Run compliant proposal'}
+            {busy && scenario === 'clean' ? 'Running…' : 'Run a clean purchase'}
           </button>
         </div>
       </div>
 
       {error && <p className="error-banner" role="alert">{error}</p>}
-      {!result && !busy && !error && <p className={styles.empty}>Run either fixture to see the proposed action and policy result.</p>}
-      {busy && <p className={styles.empty} role="status">Preparing the comparison…</p>}
+      
+      {busy && <p className={styles.empty} role="status">Running…</p>}
 
       {result && (
         <>
           <div className={styles.results}>
             <article className={styles.resultCard}>
-              <h3>Simulated action</h3>
+              <h3>Unguarded agent would pay</h3>
               <dl>
                 <div><dt>Seller / item</dt><dd>{result.proposal.sellerId} / {result.proposal.itemId}</dd></div>
                 <div><dt>Recipient</dt><dd>{result.vulnerableSimulation.action.recipient ?? 'Not provided'}</dd></div>
                 <div><dt>Amount</dt><dd>{formatScaledAmount(result.vulnerableSimulation.action.amount, result.vulnerableSimulation.action.scale)} {result.vulnerableSimulation.action.asset}</dd></div>
                 <div><dt>Proposal</dt><dd><code>{shortHash(result.vulnerableSimulation.action.proposalFingerprint)}</code></dd></div>
               </dl>
-              <p className={styles.note}>The action was simulated; it was not executed and no provider was called.</p>
+              <p className={styles.note}>Simulated. Nothing was sent.</p>
             </article>
 
             <article className={styles.resultCard}>
-              <h3>Policy result</h3>
+              <h3>With Sentinel</h3>
               <p className={styles.decision}>{decisionCopy(result.protectedPolicy.decision)}</p>
               <ul className={styles.reasons}>
                 {result.protectedPolicy.reasons.map((reason, index) => <li key={`${reason}-${index}`}>{reason}</li>)}
               </ul>
               <p className={styles.outcome}><strong>Payment outcome:</strong> {result.protectedPolicy.outcome}</p>
-              <p className={styles.note}>This policy check runs in the comparison fixture; it is not a gateway decision.</p>
+              <p className={styles.note}>Demo policy run on test data.</p>
             </article>
           </div>
 
           <details className={styles.evidence} open={showEvidence} onToggle={(event) => setShowEvidence(event.currentTarget.open)}>
-            <summary>Evidence and source locations</summary>
+            <summary>Evidence</summary>
             <dl>
               <div><dt>Attempt</dt><dd><code>{result.evidence.attemptId}</code></dd></div>
               <div><dt>Model mode</dt><dd>{result.modelMode}</dd></div>
@@ -74,7 +74,7 @@ export function ControlledComparisonPanel({ result, scenario, busy, error, onRun
               <div><dt>Source references</dt><dd>{result.evidence.sourceRefs.length ? result.evidence.sourceRefs.map((source) => <code key={source}>{source}</code>) : 'None'}</dd></div>
             </dl>
             <h4>Inspected listing spans</h4>
-            <p className={styles.note}>Character offsets within the inspected listing text; end is exclusive.</p>
+            
             {result.evidence.inspection.sources.length > 0 ? (
               <ul className={styles.sources}>
                 {result.evidence.inspection.sources.map((source, index) => (
@@ -106,9 +106,9 @@ export function ControlledComparisonPanel({ result, scenario, busy, error, onRun
 }
 
 function decisionCopy(decision: ControlledComparisonResult['protectedPolicy']['decision']): string {
-  if (decision === 'reject') return 'Rejected by the comparison policy';
-  if (decision === 'approve') return 'Allowed by the comparison policy';
-  return 'Flagged for review by the comparison policy';
+  if (decision === 'reject') return 'Blocked';
+  if (decision === 'approve') return 'Allowed';
+  return 'Held for review';
 }
 
 function shortHash(value: string): string {

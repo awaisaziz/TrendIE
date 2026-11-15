@@ -45,16 +45,34 @@ export class RequestBodyError extends Error {
   }
 }
 
+/**
+ * Same-origin JSON write check. Behind a proxy (for example Vercel) `request.url` can carry an
+ * internal host, so the public host comes from `x-forwarded-host` / `host`. The browser sets
+ * `Origin` and a cross-site page cannot forge it, so this still blocks cross-site writes.
+ */
 export function isSameOriginJsonWrite(request: Request): boolean {
   const contentType = request.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase();
   const origin = request.headers.get('origin');
   if (contentType !== 'application/json' || !origin) return false;
 
+  let originUrl: URL;
   try {
-    return new URL(origin).origin === new URL(request.url).origin;
+    originUrl = new URL(origin);
   } catch {
     return false;
   }
+  const allowed = new Set<string>();
+  try {
+    allowed.add(new URL(request.url).origin);
+  } catch {
+    // ignore: fall back to forwarded headers
+  }
+  const host = (request.headers.get('x-forwarded-host') ?? request.headers.get('host'))?.split(',', 1)[0]?.trim();
+  if (host) {
+    const proto = request.headers.get('x-forwarded-proto')?.split(',', 1)[0]?.trim() || new URL(request.url).protocol.replace(':', '');
+    if (proto === 'http' || proto === 'https') allowed.add(`${proto}://${host}`.toLowerCase());
+  }
+  return allowed.has(originUrl.origin.toLowerCase());
 }
 
 export function jsonResponse(body: unknown, status = 200): Response {
@@ -157,21 +175,25 @@ function getGatewayConfig(role: GatewayRole): { baseUrl: URL; apiKey: string } {
   try {
     baseUrl = new URL(configuredUrl);
   } catch {
-    throw new GatewayConfigurationError('GATEWAY_BASE_URL must be a valid local URL.');
+    throw new GatewayConfigurationError('GATEWAY_BASE_URL must be a valid URL.');
   }
 
-  // Loopback may use plain HTTP (local development). Any other host, such as a gateway deployed
-  // for a Vercel build, must use HTTPS so service API keys are never sent in clear text.
-  const loopbackHosts = new Set(['127.0.0.1', 'localhost', '[::1]']);
-  const isLoopback = loopbackHosts.has(baseUrl.hostname);
+  // Loopback HTTP is always allowed for local work. A deployed gateway must use HTTPS and be
+  // listed by exact hostname in GATEWAY_ALLOWED_HOSTS (comma-separated).
+  const localHosts = new Set(['127.0.0.1', 'localhost', '[::1]']);
+  const allowedRemote = new Set(
+    (process.env.GATEWAY_ALLOWED_HOSTS ?? '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean)
+  );
+  const isLocal = baseUrl.protocol === 'http:' && localHosts.has(baseUrl.hostname);
+  const isAllowedRemote = baseUrl.protocol === 'https:' && allowedRemote.has(baseUrl.hostname.toLowerCase());
   if (
-    (isLoopback ? baseUrl.protocol !== 'http:' && baseUrl.protocol !== 'https:' : baseUrl.protocol !== 'https:') ||
+    (!isLocal && !isAllowedRemote) ||
     baseUrl.username ||
     baseUrl.password ||
     baseUrl.search ||
     baseUrl.hash
   ) {
-    throw new GatewayConfigurationError('GATEWAY_BASE_URL must be a loopback URL or an HTTPS URL without credentials.');
+    throw new GatewayConfigurationError('GATEWAY_BASE_URL must be loopback HTTP or an HTTPS host listed in GATEWAY_ALLOWED_HOSTS.');
   }
   // The default (unset) URL is loopback, which does not exist on Vercel: fail closed there.
   if (process.env.VERCEL && !process.env.GATEWAY_BASE_URL?.trim()) {
@@ -180,14 +202,12 @@ function getGatewayConfig(role: GatewayRole): { baseUrl: URL; apiKey: string } {
 
   const dashboardKey = process.env.API_KEY_DASHBOARD?.trim();
   const agentKey = process.env.API_KEY_AGENT?.trim();
-  const configuredAdminKey = process.env.API_KEY_ADMIN?.trim();
-  // The well-known development key is only a local convenience; never fall back to it elsewhere.
-  const adminKey = configuredAdminKey || (process.env.NODE_ENV === 'production' || process.env.VERCEL ? undefined : 'dev-admin-key-7890');
+  const adminKey = process.env.API_KEY_ADMIN?.trim();
   if (!dashboardKey || !agentKey || dashboardKey === agentKey) {
     throw new GatewayConfigurationError('Set distinct dashboard and agent gateway keys.');
   }
   if (role === 'admin') {
-    if (!adminKey) throw new GatewayConfigurationError('Set API_KEY_ADMIN to use audit verification.');
+    if (!adminKey) throw new GatewayConfigurationError('Set API_KEY_ADMIN before using admin gateway features.');
     return { baseUrl, apiKey: adminKey };
   }
 
