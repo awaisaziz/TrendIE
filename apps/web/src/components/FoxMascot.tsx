@@ -9,7 +9,7 @@ interface FoxMascotProps {
 }
 
 const VARIANT_LABELS: Record<FoxVariant, string> = {
-  header: 'Agentic Payment Guard fox mascot',
+  header: 'Sentinel fox mascot',
   blocked: 'Guard fox holding up a stop sign',
   approved: 'Guard fox in approved stance',
   needs_review: 'Guard fox in careful review stance',

@@ -1,7 +1,39 @@
 # Changelog
 
+## 2026-11-15 — GOAT authority V1 hardening
+
+- Claim compares the request proposal with the persisted, signed proposal and recomputes the
+  shared V1 fingerprint. It checks the approval HMAC, intent owner, version, expiry and uses
+  before any write. Consume, use decrement, execution insert and audit happen in one transaction.
+- The owner comes from the server-configured key binding (`API_KEY_*_OWNER_ID`), not from the request.
+- Spend authorization is server-recorded (`GOAT_SPEND_AUTHORIZATION_ID`, `GOAT_SPEND_CEILING_WEI`).
+  The default ceiling of 0 blocks every claim. Optional `GOAT_DAILY_LIMIT_WEI` adds a rolling
+  24-hour limit per owner; pending and unknown payments count as spent.
+- Checkpoint and outcome routes never create an execution. The first transaction hash is immutable,
+  phases cannot go back, and terminal outcomes cannot change. Exact retries are idempotent.
+- Added read-only recovery `GET /v1/goat/approvals/:approvalReference/execution` with a nullable checkpoint.
+- The four probe cases in `docs/evidence/2026-11-15-goat-authority-fcd8df6.md` are now regression
+  tests with safe results (`gateway/test/goat-authority-v1.test.ts`). Offline mocks only: PostgreSQL
+  locking, concurrency and rollback are not verified. Qatom authority, history owner scoping and
+  frontend gateway wiring remain open.
+
 ## Unreleased
 
+- Record Om-directed temporary cross-owner implementation coordination (2026-11-15); original
+  role assignments and acceptance ownership remain unchanged, and Awais retains deployment authority.
+- Merge pinned `origin/develop` `ca50884d0198aab0584e2b48615dfa6397bd3bda` into candidate
+  `e3607d220674777dc45c1397bfe7430a24b6c63f` at `48aca2976c83370850df886fa04ecdce870d6b4e`.
+  Keep GOAT authority runtime HOLD; no push, deployment, database, or provider activity occurred.
+
+- Update the project record with published PR #10 QPE (`afc1258`, 26 Qatom tests and read-only
+  capability collector), published PR #11 AAT (`08016e6`, 35 agent tests) and draft PR #12 GOAT
+  (`bdcf505`, complete V1 client and 32 GOAT tests). All target `develop`; none is merged and the
+  proposed contracts remain unagreed. Record that lost `executionId` recovery by owner-scoped
+  approval reference still requires an unimplemented server endpoint. Pin combined local candidate
+  checks at `6397e1710ab7559a908af621ad0bdd24cf55fccf` (Node 22.23.4, root typecheck/lint and 135
+  tests across 25 files); all five library builds and four PDF tests also passed. Both offline CLI modes remained `NOT_SETTLED`. These checks do not prove PR-head or
+  global integration. Keep paid execution at zero, provider/authentication/price/receipt gates open,
+  and all stages open with no final adversarial review claim.
 - Implement Awais gateway shared authority, binding, and owner-scoped history endpoints:
   - Add migration `003_shared_binding_and_authority.sql` for `intents` (`intent_version`, `platform`, `chain`, `asset`, `scale`, `sender`), `approvals` (`owner_id`, `intent_version`, `bound_platform`, `bound_asset`, `bound_chain`, `bound_scale`, `bound_sender`, `bound_destination`, `spend_authorization_id`, `spend_ceiling`), and `executions` (`checkpoint_phase`, `checkpoint_tx_hash`, `owner_id`).
   - Implement `GET /approvals/:id` returning authoritative persisted binding with platform scoping and HMAC verification.

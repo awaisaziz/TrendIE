@@ -1,4 +1,5 @@
 export { createQatomClient, QATOM_ENDPOINT } from './client.js';
+export { collectCapabilities } from './capabilities.js';
 export type { QatomMcpTransport, QatomReadClient, ToolDescription } from './client.js';
 export { createQatomExecutionAdapter, disabledPaidExecution } from './execution.js';
 export { createHttpGatewayAuthority } from './gatewayClient.js';

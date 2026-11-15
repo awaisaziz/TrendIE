@@ -1,0 +1,207 @@
+.panel {
+  padding: 18px 20px;
+  margin: 16px 0;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 16px;
+  letter-spacing: -.025em;
+}
+
+.header p,
+.empty {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.empty {
+  padding-top: 12px;
+}
+
+.results {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.resultCard {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #fff;
+}
+
+.resultCard h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+}
+
+.resultCard dl,
+.evidence dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.resultCard dl > div,
+.evidence dl > div {
+  display: grid;
+  grid-template-columns: minmax(84px, .4fr) minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.resultCard dt,
+.evidence dt {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.resultCard dd,
+.evidence dd {
+  min-width: 0;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.resultCard dd span {
+  color: var(--muted);
+}
+
+.resultCard code,
+.evidence code {
+  font: 10px/1.45 ui-monospace, SFMono-Regular, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+
+.decision {
+  margin: 0 0 7px;
+  font-size: 14px;
+  font-weight: 750;
+}
+
+.reasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 12px;
+  padding-left: 17px;
+  margin: 0;
+  color: #5f5b55;
+  font-size: 11px;
+}
+
+.outcome {
+  margin: 12px 0 0;
+  font-size: 11px;
+}
+
+.note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.evidence {
+  margin-top: 14px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+.evidence summary {
+  cursor: pointer;
+  color: var(--cobalt);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.evidence[open] > dl {
+  margin-top: 12px;
+}
+
+.evidence h4 {
+  margin: 13px 0 7px;
+  font-size: 11px;
+}
+
+.evidence dd code {
+  display: block;
+}
+
+.sources {
+  display: grid;
+  gap: 7px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.sources li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: start;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #f7f5f0;
+  font-size: 10px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.sources li code {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .header {
+    display: grid;
+  }
+
+  .results {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .panel {
+    padding: 15px;
+  }
+
+  .actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .resultCard dl > div,
+  .evidence dl > div {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+
+  .sources li {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+}

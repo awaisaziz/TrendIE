@@ -33,7 +33,6 @@ function validateModelInput(input: ModelInput): SafeModelInput {
 }
 
 export function createOpenAIModel({ modelName, authorizeSpend, maxOutputTokens = 512, modelProvider }: OpenAIModelOptions): Model {
-  try { process.loadEnvFile?.('.env'); } catch {}
   if (typeof modelName !== 'string' || modelName.length < 1 || modelName.length > 128) throw new TypeError('An explicit model name is required');
   if (typeof authorizeSpend !== 'function') throw new TypeError('An asynchronous spend authorization gate is required');
   if (!Number.isSafeInteger(maxOutputTokens) || maxOutputTokens < 1 || maxOutputTokens > 4_096) throw new RangeError('Invalid model output token limit');

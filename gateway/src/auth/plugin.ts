@@ -9,6 +9,8 @@ export type { UserRole } from './keyRing.js';
 declare module 'fastify' {
   interface FastifyRequest {
     callerRole?: UserRole;
+    /** Owner principal bound to the presented key by server configuration. Never from the request. */
+    callerOwnerId?: string;
   }
 }
 
@@ -34,6 +36,7 @@ const authPluginAsync: FastifyPluginAsync<{ config?: Config }> = async (fastify,
   const failureLimiter = createRateLimiter({ max: cfg.AUTH_FAILURE_MAX, windowMs });
 
   fastify.decorateRequest('callerRole', undefined);
+  fastify.decorateRequest('callerOwnerId', undefined);
 
   fastify.addHook('onRequest', async (req: FastifyRequest, reply: FastifyReply) => {
     if (req.url === '/health' || req.method === 'OPTIONS') return;
@@ -58,7 +61,10 @@ const authPluginAsync: FastifyPluginAsync<{ config?: Config }> = async (fastify,
     const budget = requestLimiter.hit(resolved ? `key:${resolved.fingerprint}` : client);
     if (!budget.allowed) return tooManyRequests(reply, budget.retryAfterSeconds);
 
-    if (resolved) req.callerRole = resolved.role;
+    if (resolved) {
+      req.callerRole = resolved.role;
+      if (resolved.ownerId) req.callerOwnerId = resolved.ownerId;
+    }
   });
 };
 

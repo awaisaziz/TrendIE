@@ -51,3 +51,40 @@ export type SafeAuditEntry = {
   detail: string;
   timestamp: string;
 };
+
+export type ControlledComparisonResult = {
+  modelMode: 'fixture';
+  proposal: {
+    itemId: string;
+    sellerId: string;
+    amount: string;
+    scale: number;
+    asset: string;
+    recipient: string;
+  };
+  evidence: {
+    version: 1;
+    attemptId: string;
+    sourceRefs: string[];
+    inspectionMaxChars: number;
+    contentSha256: string;
+    canonicalProposalFingerprint: string;
+    inspection: {
+      findings: Array<{ code: string; start: number; end: number; excerpt: string }>;
+      truncated: boolean;
+      sourceChars: number;
+      sources: Array<{ itemId: string; sellerId: string; start: number; end: number; sourceRef: string }>;
+    };
+  };
+  vulnerableSimulation: {
+    action: { simulation: true; recipient: string; amount: string; scale: number; asset: string; proposalFingerprint: string };
+    executed: false;
+    providerDispatch: false;
+  };
+  protectedPolicy: {
+    decision: 'approve' | 'reject';
+    reasons: string[];
+    providerDispatch: false;
+    outcome: 'NOT_SETTLED';
+  };
+};

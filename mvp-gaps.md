@@ -1,8 +1,14 @@
 # MVP gaps, owners, and integration sequence
 
-**Reviewed against:** `PRD.md`, `Division.md`, current `origin/develop` at `9133094`, and the team update supplied on 2026-11-15. `main` contains this develop line through PR #8 at `0c08845`.
+**Reviewed against:** `PRD.md`, `Division.md`, `origin/develop` at `dbfac42`, the current `nasar-frontend` work including AAT runner `165038c`, and PRs #10–#12 as observed on 2026-11-15. `main` remains at the line through PR #8 (`0c08845`).
 
 **Owner mapping:** Person 1 — Awais; Persons 2, 3, and 4 — Om/Tirth; Person 5 — Nasar.
+
+**Coordination note (2026-11-15):** Om directed temporary cross-owner implementation coordination
+to reduce duplicate edits. Original role assignments and acceptance ownership remain unchanged;
+this is not evidence that owners accepted the shared authority contract or that a stage is complete.
+Awais retains deployment authority. The candidate integration preserves gateway source, but the
+new GOAT authority runtime remains HOLD pending review and verified binding behavior.
 
 ## MVP acceptance target
 
@@ -13,8 +19,9 @@ Escrow is a later optional stretch after the protected core works. A controlled 
 ## Current evidence and limits
 
 - The Person 5 console, intent form, decision display, and transient bounded PDF upload/extraction-to-verification are in the merged application. PDF inspection is **not** a completed invoice-to-payment flow; the console does not execute provider payments.
+- The current Person 5 branch adds a same-origin controlled-comparison endpoint and UI with attack/compliant-proposal cases over the same malicious listing. The server calls PR #11's `runControlledComparison` and `validateEvidence` using fixed task, discovery, fixture-model, and local-policy inputs, then returns an allowlisted projection with proposal-linked listing hashes and text spans. It preserves `simulation: true`, `executed: false`, `providerDispatch: false`, and `NOT_SETTLED`. It does not call the real Gateway, provider, wallet, or payment system, and does not close an MVP gap.
 - The repository records live Gateway/PostgreSQL PDF and replay demo runs. The replay demo checks approval consumption, duplicate-consume rejection, intent exhaustion, and expiry. These establish gateway authorization behavior, not provider settlement.
-- G-06 is **partially closed**: the protected malicious proposal is sent to the gateway, but the vulnerable `wallet.sendTransaction` path is printed rather than run through an unprotected agent. The clean path consumes an approval but does not dispatch payment. Script/UI text that says funds were stolen or payment settled overstates the evidence.
+- G-06 is **partially closed**: the current frontend now removes the false “funds stolen”/“blocked” paired-attack panel and calls PR #11's controlled runner with a fixture model and local policy. The fixture comparison simulates an action; it does not call the real gateway for that comparison or dispatch a clean payment. Other demo/script claims still require review.
 - G-07 is recorded as **closed on develop** for PDF extraction/inspection reaching Gateway verification and audit evidence. It does not close the broader invoice-to-provider-payment flow.
 - G-09 is **partially closed**: replay behavior has live Gateway/PostgreSQL evidence, while provider settlement remains unverified and some demo wording still overclaims.
 - The team reports PostgreSQL is available on a Mac. A dedicated TrendIE database/schema and matching gateway/frontend environment are still needed. Docker is optional when the gateway can reach PostgreSQL. `localhost` refers to the gateway machine: a Windows-hosted gateway cannot use `127.0.0.1` to reach a Mac database. In this workspace, the Docker Compose attempt failed with a read-only container-storage error; that does not establish that the reported Mac PostgreSQL server is unavailable.
@@ -28,14 +35,14 @@ Escrow is a later optional stretch after the protected core works. A controlled 
 | F-001 Trusted intent | Partial | Person 1 / Awais; Person 5 / Nasar UI contribution | Store and verify trusted owner/constraints in the dedicated database under the agreed shared schema. |
 | F-002 Verification/authorization | Partial | Person 1 / Awais | Bind exact, versioned proposal to an authenticated owner and intent; enforce expiry, single use, replay, and concurrency through the gateway. |
 | F-003 Gateway interception | Partial | Person 1 / Awais; Persons 2–3 / Om/Tirth adapters | Adapters receive and enforce the persisted gateway binding; no local adapter code may construct authority from caller input. Prove unauthorized requests stop before provider dispatch. |
-| F-004 Inspection | Partial | Person 4 / Om/Tirth; Person 5 / Nasar upload/display | Preserve findings and provenance against the exact proposal/decision; test clean and malicious listing/PDF paths and document scanner limits. |
-| F-005 Attack comparison | Partial | Person 4 / Om/Tirth; Person 5 / Nasar demo integration | Run a controlled vulnerable agent with the same malicious input and capture its changed proposal/action; show the protected gateway rejection and a legitimate provider-backed purchase. No unsafe on-chain attack is needed. |
+| F-004 Inspection | Partial | Person 4 / Om/Tirth; Person 5 / Nasar upload/display | The frontend displays fixture listing source spans, content hash, and proposal fingerprint; still link clean/malicious listing and PDF findings to the exact persisted proposal/decision and document scanner limits. |
+| F-005 Attack comparison | Partial | Person 4 / Om/Tirth; Person 5 / Nasar demo integration | The frontend now presents PR #11 runner output for fixed attack/clean fixtures and the local policy result. Still obtain final adversarial clearance, demonstrate the protected Gateway rejection with persisted evidence, and complete a legitimate provider-backed purchase. No unsafe on-chain attack is needed. |
 | F-006 GOAT payment | Blocked | Person 2 / Om/Tirth; Person 1 / Awais gateway | Persisted binding, checkpoints/recovery, isolated wallet, separate numeric spend authorization, one bounded Testnet3 payment, checked receipt, and persisted outcome. |
 | F-007 Qatom checkout | Blocked | Person 3 / Om/Tirth; Person 1 / Awais gateway | Authenticated MCP/tool evidence, checkout schema, atomic exact-price/currency guarantee in the checkout operation, gateway-authorized execution, supported verified receipt, and documented limitations. |
 | F-008 Audit/outcome records | Partial | Person 1 / Awais | Durable linked intent, proposal, findings, decision, execution identity, provider result, and outcome with safe recovery from uncertainty. |
 | F-009 Dashboard/history | Partial | Person 5 / Nasar; Person 1 / Awais and provider owners | Owner-scoped reloadable history, payment lifecycle, actual provider receipts, and distinct pending/unknown states. Requires approved read APIs and provider result facts. |
 | F-010 Human review | Blocked | Person 1 / Awais API; Person 5 / Nasar UI | Authenticated reviewer identity, owner-scoped review queue/read API, authorized resolution controls, audit record, and proof unresolved review cannot execute. |
-| F-013 Integrated demo readiness | Blocked | Person 5 / Nasar, with Persons 1–4 / Awais, Om/Tirth | One current-revision environment runs the protected flow, attack evidence, legitimate provider payment, supported Qatom path, and persisted audit/outcome view with truthful labels. |
+| F-013 Integrated demo readiness | Blocked | Person 5 / Nasar, with Persons 1–4 / Awais, Om/Tirth | The fixture comparison improves truthful demo presentation but is not an integrated run. One current-revision environment must run the protected flow, attack evidence, legitimate provider payment, supported Qatom path, and persisted audit/outcome view. |
 
 F-011 escrow and F-012 delivery verification remain Stage 6/stretch work and do not block the core MVP.
 
