@@ -160,25 +160,37 @@ function getGatewayConfig(role: GatewayRole): { baseUrl: URL; apiKey: string } {
     throw new GatewayConfigurationError('GATEWAY_BASE_URL must be a valid local URL.');
   }
 
-  const localHosts = new Set(['127.0.0.1', 'localhost', '[::1]']);
+  // Loopback may use plain HTTP (local development). Any other host, such as a gateway deployed
+  // for a Vercel build, must use HTTPS so service API keys are never sent in clear text.
+  const loopbackHosts = new Set(['127.0.0.1', 'localhost', '[::1]']);
+  const isLoopback = loopbackHosts.has(baseUrl.hostname);
   if (
-    baseUrl.protocol !== 'http:' ||
-    !localHosts.has(baseUrl.hostname) ||
+    (isLoopback ? baseUrl.protocol !== 'http:' && baseUrl.protocol !== 'https:' : baseUrl.protocol !== 'https:') ||
     baseUrl.username ||
     baseUrl.password ||
     baseUrl.search ||
     baseUrl.hash
   ) {
-    throw new GatewayConfigurationError('GATEWAY_BASE_URL must point to a loopback HTTP host.');
+    throw new GatewayConfigurationError('GATEWAY_BASE_URL must be a loopback URL or an HTTPS URL without credentials.');
+  }
+  // The default (unset) URL is loopback, which does not exist on Vercel: fail closed there.
+  if (process.env.VERCEL && !process.env.GATEWAY_BASE_URL?.trim()) {
+    throw new GatewayConfigurationError('Set GATEWAY_BASE_URL to the deployed gateway HTTPS URL.');
   }
 
   const dashboardKey = process.env.API_KEY_DASHBOARD?.trim();
   const agentKey = process.env.API_KEY_AGENT?.trim();
-  const adminKey = process.env.API_KEY_ADMIN?.trim() || 'dev-admin-key-7890';
+  const configuredAdminKey = process.env.API_KEY_ADMIN?.trim();
+  // The well-known development key is only a local convenience; never fall back to it elsewhere.
+  const adminKey = configuredAdminKey || (process.env.NODE_ENV === 'production' || process.env.VERCEL ? undefined : 'dev-admin-key-7890');
   if (!dashboardKey || !agentKey || dashboardKey === agentKey) {
-    throw new GatewayConfigurationError('Set distinct local dashboard and agent gateway keys.');
+    throw new GatewayConfigurationError('Set distinct dashboard and agent gateway keys.');
+  }
+  if (role === 'admin') {
+    if (!adminKey) throw new GatewayConfigurationError('Set API_KEY_ADMIN to use audit verification.');
+    return { baseUrl, apiKey: adminKey };
   }
 
-  const apiKey = role === 'dashboard' ? dashboardKey : role === 'admin' ? adminKey : agentKey;
+  const apiKey = role === 'dashboard' ? dashboardKey : agentKey;
   return { baseUrl, apiKey };
 }

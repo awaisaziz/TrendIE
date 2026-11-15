@@ -39,8 +39,11 @@ export function createOpenAIModel({ modelName, authorizeSpend, maxOutputTokens =
   if (!Number.isSafeInteger(maxOutputTokens) || maxOutputTokens < 1 || maxOutputTokens > 4_096) throw new RangeError('Invalid model output token limit');
   if (!process.env.OPENAI_API_KEY && process.env.BACKBOARD_API_KEY) {
     process.env.OPENAI_API_KEY = process.env.BACKBOARD_API_KEY;
+    // Backboard's documented API (https://docs.backboard.io, base https://app.backboard.io/api, X-API-Key
+    // auth) is not documented as OpenAI-compatible, so no base URL is guessed: it must be set explicitly.
     if (!process.env.OPENAI_BASE_URL) {
-      process.env.OPENAI_BASE_URL = process.env.BACKBOARD_BASE_URL || 'https://api.backboard.io/v1';
+      if (!process.env.BACKBOARD_BASE_URL) throw new Error('BACKBOARD_BASE_URL is required with BACKBOARD_API_KEY');
+      process.env.OPENAI_BASE_URL = process.env.BACKBOARD_BASE_URL;
     }
   }
   if (!process.env.OPENAI_API_KEY && !process.env.BACKBOARD_API_KEY && !modelProvider) {

@@ -78,4 +78,5 @@ export async function runPurchaseWorkflow(input: { task: TrustedTask; query: str
 }
 
 export { createGeminiModel, type GeminiModelOptions } from './gemini.js';
+export { createBackboardModel, BACKBOARD_ENDPOINT, type BackboardModelOptions } from './backboard.js';
 

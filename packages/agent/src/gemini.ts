@@ -21,7 +21,7 @@ export type GeminiModelOptions = {
 type ModelInput = { task: string; listings: Listing[]; signal: AbortSignal; maxTurns: number; maxToolCalls: number };
 type SafeModelInput = { task: string; listings: Listing[]; signal: AbortSignal; maxTurns: number; maxToolCalls: number };
 
-function validateModelInput(input: ModelInput): SafeModelInput {
+export function validateModelInput(input: ModelInput): SafeModelInput {
   if (!input || typeof input !== 'object' || Object.getPrototypeOf(input) !== Object.prototype || Object.getOwnPropertySymbols(input).length) {
     throw new TypeError('Invalid model input');
   }
